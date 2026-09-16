@@ -59,7 +59,7 @@ export default function App() {
     setErrorMessage(null);
 
     try {
-      const response = await fetch('/api/check-website', {
+      let response = await fetch('/api/check-website', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -67,10 +67,28 @@ export default function App() {
         body: JSON.stringify({ url: queryUrl }),
       });
 
-      const data = await response.json();
+      // If POST method is not allowed (e.g. some Vercel edge/proxy rewrites), fall back to GET
+      if (response.status === 405) {
+        response = await fetch(`/api/check-website?url=${encodeURIComponent(queryUrl)}`, {
+          method: 'GET',
+        });
+      }
+
+      const contentType = response.headers.get('content-type') || '';
+      let data: any;
+      if (contentType.includes('application/json')) {
+        data = await response.json();
+      } else {
+        const text = await response.text();
+        throw new Error(
+          !response.ok
+            ? `Server error (${response.status}): ${text.slice(0, 100)}`
+            : 'Received invalid non-JSON response from serverless function'
+        );
+      }
 
       if (!response.ok) {
-        throw new Error(data.error || `HTTP error ${response.status}: Failed to inspect website`);
+        throw new Error(data?.error || `HTTP error ${response.status}: Failed to inspect website`);
       }
 
       const result: WebsiteCheckResult = data;
