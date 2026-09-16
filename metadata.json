@@ -1,0 +1,6 @@
+{
+  "name": "Domain Intelligence & Website Monitoring System",
+  "description": "Professional SaaS-style website health, DNS, and SSL certificate monitoring system with real-time analytics and uptime tracking.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
