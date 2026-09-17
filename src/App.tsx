@@ -7,14 +7,17 @@ import { SslInfoCard } from './components/SslInfoCard';
 import { ResponseTimeChart } from './components/ResponseTimeChart';
 import { MonitoringHistoryTable } from './components/MonitoringHistoryTable';
 import { EmptyState } from './components/EmptyState';
+import { DiagnosisRecoverySection } from './components/DiagnosisRecoverySection';
 import { WebsiteCheckResult, MonitoringHistoryItem, ResponseTimeDataPoint } from './types';
-import { AlertCircle, X, RefreshCw, Radio, CheckCircle, ShieldAlert } from 'lucide-react';
+import { AlertCircle, X, RefreshCw, Radio, CheckCircle, CheckCircle2, ShieldAlert } from 'lucide-react';
 
 export default function App() {
   const [url, setUrl] = useState<string>('');
   const [currentResult, setCurrentResult] = useState<WebsiteCheckResult | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [recoveryNotification, setRecoveryNotification] = useState<'recovered' | 'still_down' | null>(null);
+  const [showDiagnosisSection, setShowDiagnosisSection] = useState<boolean>(false);
 
   // Near Real-Time Monitoring state (10s interval)
   const [isRealTimeActive, setIsRealTimeActive] = useState<boolean>(false);
@@ -48,11 +51,15 @@ export default function App() {
   }, [history]);
 
   // Execute Website Check via server-side API
-  const performCheck = useCallback(async (targetUrl?: string) => {
+  const performCheck = useCallback(async (targetUrl?: string, isRecovery: boolean = false) => {
     const queryUrl = (targetUrl || urlRef.current).trim();
     if (!queryUrl) {
       setErrorMessage('Please enter a website URL to check.');
       return;
+    }
+
+    if (!isRecovery) {
+      setRecoveryNotification(null);
     }
 
     setIsLoading(true);
@@ -94,6 +101,20 @@ export default function App() {
       const result: WebsiteCheckResult = data;
       setCurrentResult(result);
 
+      if (!isRecovery) {
+        // New check: only show diagnosis if status is DOWN
+        setShowDiagnosisSection(result.status === 'DOWN');
+        setRecoveryNotification(null);
+      } else {
+        // Recovery check: keep diagnosis section visible to display recovery outcome
+        setShowDiagnosisSection(true);
+        if (result.status === 'UP') {
+          setRecoveryNotification('recovered');
+        } else {
+          setRecoveryNotification('still_down');
+        }
+      }
+
       // Record to history
       const historyItem: MonitoringHistoryItem = {
         id: 'hist-' + Date.now() + '-' + Math.random().toString(36).substring(2, 7),
@@ -133,8 +154,11 @@ export default function App() {
         ];
         return newPoints.slice(-25); // Keep last 25 points for chart readability
       });
+
+      return result;
     } catch (err: any) {
       setErrorMessage(err.message || 'An unexpected error occurred while communicating with the server.');
+      return null;
     } finally {
       setIsLoading(false);
     }
@@ -298,6 +322,15 @@ export default function App() {
               totalChecks={totalChecks}
               successfulChecks={successfulChecks}
             />
+
+            {/* Intelligent Issue Diagnosis & Recovery (visible when DOWN or during/after recovery check) */}
+            {showDiagnosisSection && currentResult && (
+              <DiagnosisRecoverySection
+                result={currentResult}
+                onRetry={() => performCheck(currentResult.url, true)}
+                isChecking={isLoading}
+              />
+            )}
 
             {/* 2. DNS & SSL Information Cards (2 Columns) */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
